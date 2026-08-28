@@ -7,5 +7,5 @@
     [golem.ui-test]
     [figwheel.main.testing :refer [run-tests-async]]))
 
-(defn -main [& args]
+(defn -main [& _args]
   (run-tests-async 5000))

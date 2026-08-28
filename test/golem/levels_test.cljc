@@ -35,7 +35,7 @@
           (str "level " id " solution must fit the scroll capacity")))))
 
 (deftest level-data-is-well-formed
-  (doseq [{:keys [id start dir gem palette capacity rune] :as level} levels/all]
+  (doseq [{:keys [id start dir gem palette capacity] :as level} levels/all]
     (testing (str "level " id)
       (is (g/in-bounds? start)
           (str "level " id " :start " start " is off the board"))
