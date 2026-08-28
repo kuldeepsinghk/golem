@@ -81,10 +81,48 @@
     :max-steps (or max-steps default-max-steps)
     :rewrite   nil}))         ; set for one step when the scroll was rewritten
 
+(defn- rewrite-with
+  "Rewrite the rest of the scroll with `f`, and record that it fired.
+
+   `rewrite-type` is what lands in :rewrite for the UI to announce. It names
+   the mechanic, not the tile — :x3 records :unfold — because golem.ui's
+   message table is keyed on the mechanic."
+  [state f rewrite-type]
+  (-> state
+      (update :scroll f)
+      (assoc :rewrite {:type rewrite-type})))
+
+(defn- walk
+  "Move the golem one square in the direction it faces.
+
+   `step` calls this with the scroll already advanced past the :walk tile,
+   so the only question left is where the golem lands: off the board
+   (:crashed), onto a rune (the rest of the scroll is rewritten), onto the
+   gem (:won), or onto plain floor.
+
+   A rune sitting ON the gem applies both, which is why the gem check reads
+   the state the rune already rewrote instead of standing beside it as a
+   separate branch."
+  [{:keys [pos dir level] :as state}]
+  (let [dest (mapv + pos (delta dir))]
+    (if-not (in-bounds? dest)
+      (assoc state :status :crashed)
+      (let [effect (when (= dest (get-in level [:rune :at]))
+                     (get-in level [:rune :effect]))
+            moved  (cond-> (assoc state :pos dest
+                                        :rewrite (when effect
+                                                   {:type :rune :effect effect}))
+                     effect (update :scroll (scroll/rune-effects effect)))]
+        (cond-> moved
+          (= dest (:gem level)) (assoc :status :won))))))
+
 (defn step
   "Consume the head of the scroll, produce the next state.
-   The entire game is (iterate step initial-state)."
-  [{:keys [scroll pos dir level] :as state}]
+   The entire game is (iterate step initial-state).
+
+   Every tile is one line of the `case` below: the golem's move lives in
+   `walk`, a scroll rewrite is an `update` on the already-advanced scroll."
+  [{:keys [scroll] :as state}]
   (if-not (running? state)
     state
     (cond
@@ -96,35 +134,24 @@
       (assoc state :status :exhausted :rewrite nil)
 
       :else
-      (let [tile   (first scroll)
-            remain (vec (rest scroll))
-            state  (-> state
-                       (update :steps inc)
-                       (assoc :rewrite nil :last-tile tile))]
+      ;; The tile is consumed once, here — every branch below reads a state
+      ;; whose scroll has ALREADY advanced past it. So a rewrite is an
+      ;; `update` on that scroll, a turn touches only :dir, and a new tile
+      ;; cannot forget to move the scroll on.
+      (let [tile  (first scroll)
+            state (-> state
+                      (update :steps inc)
+                      (update :scroll (comp vec rest))
+                      (assoc :rewrite nil :last-tile tile))]
         (case tile
-          :walk
-          (let [pos' (mapv + pos (delta dir))]
-            (if-not (in-bounds? pos')
-              (assoc state :status :crashed :scroll remain)
-              (let [effect  (when (= pos' (get-in level [:rune :at]))
-                              (get-in level [:rune :effect]))
-                    scroll' (if effect ((scroll/rune-effects effect) remain) remain)
-                    state'  (assoc state :pos pos' :scroll scroll'
-                                         :rewrite (when effect {:type :rune :effect effect}))]
-                (if (= pos' (:gem level))
-                  (assoc state' :status :won)
-                  state'))))
-
-          :left   (assoc state :dir (turn-left dir)  :scroll remain)
-          :right  (assoc state :dir (turn-right dir) :scroll remain)
-          :x3     (assoc state :scroll (scroll/unfold-3 remain)
-                               :rewrite {:type :unfold})
-          :mirror (assoc state :scroll (scroll/mirror remain)
-                               :rewrite {:type :mirror})
-          :echo   (assoc state :scroll (scroll/echo remain)
-                               :rewrite {:type :echo})
-          ;; unknown tile: skip it
-          (assoc state :scroll remain))))))
+          :walk   (walk state)
+          :left   (update state :dir turn-left)
+          :right  (update state :dir turn-right)
+          :x3     (rewrite-with state scroll/unfold-3 :unfold)
+          :mirror (rewrite-with state scroll/mirror   :mirror)
+          :echo   (rewrite-with state scroll/echo     :echo)
+          ;; unknown tile: skip it — the scroll already advanced past it
+          state)))))
 
 (defn trace
   "Run a state to completion; returns the vector of every state along the way.
