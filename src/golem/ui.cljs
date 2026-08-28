@@ -7,7 +7,8 @@
    (unfold, mirror, rune) happens before the player's eyes."
   (:require [reagent.core :as r]
             [reagent.dom.client :as rdomc]
-            [golem.core :as g]))
+            [golem.core :as g]
+            [golem.levels :as levels]))
 
 ;; ─────────────────────────────────────────────────────────────
 ;; State
@@ -18,7 +19,7 @@
                   :game     nil      ; engine state while running / finished
                   :timer    nil}))
 
-(defn current-level [] (nth g/levels (:level-ix @state)))
+(defn current-level [] (nth levels/all (:level-ix @state)))
 
 ;; ─────────────────────────────────────────────────────────────
 ;; Actions
@@ -217,7 +218,7 @@
 
 (defn level-tabs []
   [:div {:style {:display "flex" :gap 6 :margin-bottom 12}}
-   (for [[ix {:keys [id name]}] (map-indexed vector g/levels)]
+   (for [[ix {:keys [id name]}] (map-indexed vector levels/all)]
      ^{:key id}
      [:div {:on-click #(select-level! ix)
             :style {:padding "6px 12px" :border-radius 6 :cursor "pointer"
