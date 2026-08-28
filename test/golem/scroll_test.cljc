@@ -26,8 +26,9 @@
     (is (= [:c :b :a] (scroll/reverse [:a :b :c])))
     (is (= [] (scroll/reverse []))))
   (testing "rune-effects looks the plain scroll->scroll functions up by key"
-    (is (= [:c :b :a] ((scroll/rune-effects :reverse) [:a :b :c])))
-    (is (= [:right]   ((scroll/rune-effects :mirror)  [:left])))))
+    ;; the lookup is what lets a level name its curse in data — :effect
+    ;; :reverse in golem.levels resolves to a function only here
+    (is (= [:c :b :a] ((scroll/rune-effects :reverse) [:a :b :c])))))
 
 (deftest every-rewriter-returns-a-scroll
   ;; a rewriter that leaks a seq still walks, then breaks the moment the UI

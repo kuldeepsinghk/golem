@@ -53,5 +53,4 @@
   "Floor runes, as data. A level says {:rune {:at [2 4] :effect :reverse}}
    and we look the function up here. Adding a new curse to the game
    is adding one entry to this map."
-  {:reverse reverse
-   :mirror  mirror})
+  {:reverse reverse})
