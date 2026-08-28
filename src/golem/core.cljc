@@ -10,8 +10,11 @@
    The reader gives us programs-as-data; the sequence library
    gives us program transformation.
 
-   The levels themselves live in golem.levels — this namespace
-   knows how to read a scroll, not which puzzles exist.")
+   The rewriters themselves live in golem.scroll, the levels in
+   golem.levels — this namespace knows how to READ a scroll: when a
+   rewrite fires and what it does to the golem, not which puzzles exist
+   or how a scroll is transformed."
+  (:require [golem.scroll :as scroll]))
 
 ;; ─────────────────────────────────────────────────────────────
 ;; The world
@@ -25,38 +28,6 @@
 
 (defn in-bounds? [[x y]]
   (and (< -1 x cols) (< -1 y rows)))
-
-;; ─────────────────────────────────────────────────────────────
-;; Scroll rewriters — this is the homoiconic heart.
-;; Each one is just a function: scroll -> scroll.
-
-(def flip-turn {:left :right, :right :left})
-
-(defn mirror-scroll
-  "Flip every turn tile still on the scroll."
-  [scroll]
-  (mapv #(get flip-turn % %) scroll))
-
-(defn unfold-3
-  "Triple the first tile of the remaining scroll."
-  [scroll]
-  (if-let [t (first scroll)]
-    (into [t t t] (rest scroll))
-    (vec scroll)))
-
-(defn echo-scroll
-  "Duplicate the entire remaining scroll — everything after this point
-   plays twice. A loop, in one line."
-  [scroll]
-  (into (vec scroll) scroll))
-
-(def rune-effects
-  "Floor runes, as data. A level says {:rune {:at [2 4] :effect :reverse}}
-   and we look the function up here. Adding a new curse to the game
-   is adding one entry to this map."
-  {:reverse (comp vec reverse)
-   :mirror  mirror-scroll
-   :vanish  (comp vec rest)})
 
 ;; ─────────────────────────────────────────────────────────────
 ;; Reading one tile
@@ -137,7 +108,7 @@
               (assoc state :status :crashed :scroll remain)
               (let [effect  (when (= pos' (get-in level [:rune :at]))
                               (get-in level [:rune :effect]))
-                    scroll' (if effect ((rune-effects effect) remain) remain)
+                    scroll' (if effect ((scroll/rune-effects effect) remain) remain)
                     state'  (assoc state :pos pos' :scroll scroll'
                                          :rewrite (when effect {:type :rune :effect effect}))]
                 (if (= pos' (:gem level))
@@ -146,11 +117,11 @@
 
           :left   (assoc state :dir (turn-left dir)  :scroll remain)
           :right  (assoc state :dir (turn-right dir) :scroll remain)
-          :x3     (assoc state :scroll (unfold-3 remain)
+          :x3     (assoc state :scroll (scroll/unfold-3 remain)
                                :rewrite {:type :unfold})
-          :mirror (assoc state :scroll (mirror-scroll remain)
+          :mirror (assoc state :scroll (scroll/mirror remain)
                                :rewrite {:type :mirror})
-          :echo   (assoc state :scroll (echo-scroll remain)
+          :echo   (assoc state :scroll (scroll/echo remain)
                                :rewrite {:type :echo})
           ;; unknown tile: skip it
           (assoc state :scroll remain))))))
@@ -194,7 +165,7 @@
 (defn rewrites
   "Every scroll rewrite that fired, in order, as the maps step records:
    {:type :unfold}, {:type :mirror}, {:type :echo},
-   {:type :rune :effect <key of rune-effects>}."
+   {:type :rune :effect <key of scroll/rune-effects>}."
   ([level scroll] (rewrites level scroll nil))
   ([level scroll opts]
    (into [] (keep :rewrite) (trace (init-state level scroll opts)))))

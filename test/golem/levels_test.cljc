@@ -7,7 +7,8 @@
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.string :as str]
             [golem.core :as g]
-            [golem.levels :as levels]))
+            [golem.levels :as levels]
+            [golem.scroll :as scroll]))
 
 (defn level-by-id
   "Look a level up by :id, never by position — so inserting or reordering
@@ -55,16 +56,16 @@
           (str "level " id " needs a :desc — the level blurb shows it")))))
 
 (deftest rune-levels-name-a-real-effect
-  ;; core/step does ((rune-effects effect) remain) — an unknown :effect is
+  ;; core/step does ((scroll/rune-effects effect) remain) — an unknown :effect is
   ;; not a wrong answer, it is a nil call that throws the moment the golem
   ;; steps on the rune. Catch the typo here instead.
   (doseq [{:keys [id rune]} (filter :rune levels/all)]
     (testing (str "level " id)
       (is (g/in-bounds? (:at rune))
           (str "level " id " :rune :at " (:at rune) " is off the board"))
-      (is (contains? g/rune-effects (:effect rune))
+      (is (contains? scroll/rune-effects (:effect rune))
           (str "level " id " :rune :effect " (:effect rune)
-               " is not one of " (sort (keys g/rune-effects)))))))
+               " is not one of " (sort (keys scroll/rune-effects)))))))
 
 (deftest solutions-only-use-tiles-from-the-palette
   ;; a solution that needs a tile the player has no button for is

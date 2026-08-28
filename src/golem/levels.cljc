@@ -9,7 +9,7 @@
    Keys:
      :id :name :desc          what the player sees
      :start :dir :gem         where the golem begins and what it wants
-     :rune                    optional {:at [x y] :effect <key of core/rune-effects>}
+     :rune                    optional {:at [x y] :effect <key of scroll/rune-effects>}
      :palette                 which tiles the player may lay down
      :capacity                how many tiles fit on the scroll
      :solution                a reference answer, verified by the tests")

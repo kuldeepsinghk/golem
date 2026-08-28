@@ -3,6 +3,7 @@
   (:require
     ;; require all the namespaces that you want to test
     [golem.core-test]
+    [golem.scroll-test]
     [golem.levels-test]
     [golem.ui-test]
     [figwheel.main.testing :refer [run-tests-async]]))
