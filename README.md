@@ -30,6 +30,25 @@ To create a production build run:
 	lein fig:min
 
 
+## Tests and coverage
+
+The engine lives in `.cljc`, so it runs on both platforms and is tested on both:
+
+	lein test        # JVM — golem.core, golem.scroll, golem.levels
+	lein fig:test    # ClojureScript — the above plus golem.ui
+
+To see which lines the tests actually execute:
+
+	lein cov
+
+That writes `target/coverage/index.html`: a page per file with every line
+marked covered, not-covered, or partial (some forms on the line ran, some
+did not). Use it to find untested branches, not as a score.
+
+Coverage is JVM-only, so it measures the `.cljc` engine and reports nothing
+for `golem.ui` — that namespace is covered only in the sense that
+`lein fig:test` passes.
+
 ## License
 
 Copyright © 2018 FIXME
