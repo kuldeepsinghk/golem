@@ -113,8 +113,8 @@
 (defn step
   "Consume the head of the scroll, produce the next state.
    The entire game is (iterate step initial-state)."
-  [{:keys [scroll pos dir level status] :as state}]
-  (if (not= status :running)
+  [{:keys [scroll pos dir level] :as state}]
+  (if-not (running? state)
     state
     (cond
       (empty? scroll)
@@ -164,7 +164,7 @@
   [state]
   (let [backstop (+ 2 (or (:max-steps state) default-max-steps))]
     (loop [s state, acc [state]]
-      (if (or (not= (:status s) :running) (> (count acc) backstop))
+      (if (or (not (running? s)) (> (count acc) backstop))
         acc
         (let [s' (step s)]
           (recur s' (conj acc s')))))))
