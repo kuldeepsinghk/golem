@@ -15,6 +15,12 @@
 
   :source-paths ["src"]
 
+  ;; keep `lein test` sub-second — that is the loop you run on every save.
+  ;; Tag anything expensive ^:slow and reach it with `lein test :slow`.
+  :test-selectors {:default (complement :slow)
+                   :slow    :slow
+                   :all     (constantly true)}
+
   :aliases {"fig:build" ["trampoline" "run" "-m" "figwheel.main" "-b" "dev" "-r"]
             "fig:clean" ["run" "-m" "figwheel.main" "--clean" "dev"]
             "fig:min"   ["run" "-m" "figwheel.main" "-O" "advanced" "-bo" "dev"]

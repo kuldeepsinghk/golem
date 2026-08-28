@@ -31,7 +31,7 @@
 
 (defn tick! []
   (swap! state update :game g/step)
-  (when (not= :running (get-in @state [:game :status]))
+  (when-not (g/running? (:game @state))
     (stop-timer!)))
 
 (defn start! []
@@ -42,7 +42,7 @@
 (defn step-once! []
   (stop-timer!)
   (if (:game @state)
-    (when (= :running (get-in @state [:game :status]))
+    (when (g/running? (:game @state))
       (swap! state update :game g/step))
     (swap! state assoc :game (g/init-state (current-level) (:scroll @state)))))
 
@@ -136,8 +136,7 @@
       (concat
         (for [[i t] (map-indexed vector tiles)]
           ^{:key (str "t" i)}
-          [tile-chip t {:head? (and live? (zero? i)
-                                    (= :running (:status game)))
+          [tile-chip t {:head? (and live? (zero? i) (g/running? game))
                         :on-click (when-not live? #(remove-tile! i))}])
         (when-not live?
           (for [i (range (- cap (count tiles)))]
@@ -174,16 +173,27 @@
                           :transition "all 0.2s"}}
            (if won? "🗿" (golem-glyph dir))])])]))
 
+(def status-message
+  "What the player is told for each engine status, as [message colour].
+
+   Every entry is a function of the game state, so :running can report
+   its step count with the same shape as the rest. The keys must cover
+   golem.core/statuses exactly — golem.ui-test pins that, because a
+   missing key used to render a blank banner and say nothing."
+  {:won       (fn [_]    ["💎 The golem reaches the gem. The scroll ran true." "#4ade80"])
+   :crashed   (fn [_]    ["The golem walks into the wall. Rewrite the scroll." "#f87171"])
+   :empty     (fn [_]    ["The scroll runs out before the gem. Too few words." "#fbbf24"])
+   :exhausted (fn [_]    ["The golem collapses. The scroll never ends." "#a78bfa"])
+   :running   (fn [game] [(str "Reading the scroll… step " (:steps game)) "#94a3b8"])})
+
 (defn status-banner []
   (when-let [game (:game @state)]
     (let [[msg color]
-          (case (:status game)
-            :won     ["💎 The golem reaches the gem. The scroll ran true." "#4ade80"]
-            :crashed ["The golem walks into the wall. Rewrite the scroll." "#f87171"]
-            :empty   ["The scroll runs out before the gem. Too few words." "#fbbf24"]
-            :exhausted ["The golem collapses. The scroll never ends." "#a78bfa"]
-            :running [(str "Reading the scroll… step " (:steps game)) "#94a3b8"]
-            nil)]
+          (if-let [describe (status-message (:status game))]
+            (describe game)
+            ;; a status the engine grew and the UI was not taught: say so
+            ;; out loud rather than rendering an empty banner
+            [(str "The golem stops: " (:status game)) "#94a3b8"])]
       [:div {:style {:margin "10px 0" :font-family "Georgia, serif"
                      :font-size 16 :color color :min-height 22}}
        msg])))
@@ -254,11 +264,21 @@
 ;; The React 18 root is created once and kept across hot reloads —
 ;; createRoot on an already-rooted container would warn and remount.
 
-(defonce root
-         (delay (rdomc/create-root (js/document.getElementById "app"))))
+(defonce root (atom nil))
+
+(defn- ensure-root
+  "The React 18 root, created once and kept across hot reloads.
+   Returns nil when there is no #app on the page — which is the case in
+   the test host page, so requiring this namespace stays side-effect safe."
+  []
+  (when-not @root
+    (when-let [el (js/document.getElementById "app")]
+      (reset! root (rdomc/create-root el))))
+  @root)
 
 (defn mount! []
-  (rdomc/render @root [game-root]))
+  (when-let [r (ensure-root)]
+    (rdomc/render r [game-root])))
 
 ;; figwheel calls this after any namespace is reloaded, so a change
 ;; to the engine in core.cljc re-renders the board too.
