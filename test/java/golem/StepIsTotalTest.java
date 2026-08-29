@@ -34,14 +34,18 @@ import org.junit.jupiter.params.provider.MethodSource;
 class StepIsTotalTest {
 
     // Clojure names are resolved as vars. The require must happen before any
-    // golem.core var is looked up, so this block sits above those fields.
+    // of them is looked up, so this block sits above those fields.
     private static final IFn REQUIRE = Clojure.var("clojure.core", "require");
-    static { REQUIRE.invoke(Clojure.read("golem.core")); }
+    static { REQUIRE.invoke(Clojure.read("golem.core"), Clojure.read("golem.replay")); }
 
     private static final IFn INIT_STATE = Clojure.var("golem.core", "init-state");
     private static final IFn STEP       = Clojure.var("golem.core", "step");
-    private static final IFn TRACE      = Clojure.var("golem.core", "trace");
     private static final IFn PEEK       = Clojure.var("clojure.core", "peek");
+
+    // trace is not part of the engine: nothing in src/ runs a scroll to
+    // completion, so it lives with the tests in golem.replay. Only step and
+    // init-state below come from the shipping namespace.
+    private static final IFn TRACE      = Clojure.var("golem.replay", "trace");
 
     /** :some-keyword — an interned constant; the nearest Java analogue is an enum value. */
     private static Keyword kw(String name) { return Keyword.intern(name); }

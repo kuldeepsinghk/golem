@@ -26,7 +26,8 @@
      impossible route."
   (:require [clojure.test :refer [deftest is testing]]
             [golem.core :as g]
-            [golem.levels :as levels]))
+            [golem.levels :as levels]
+            [golem.replay :as replay]))
 
 (defn- level-by-id
   "Look a level up by :id, never by position, so reordering golem.levels/all
@@ -118,13 +119,13 @@
   (doseq [{:keys [why level scroll outcome path rewrites steps]} scenarios
           :let [lvl (level-by-id level)]]
     (testing why
-      (is (= outcome (g/outcome lvl scroll))
+      (is (= outcome (replay/outcome lvl scroll))
           "the run ended differently than the scenario says")
-      (is (= path (g/path lvl scroll))
+      (is (= path (replay/path lvl scroll))
           "the golem took a different route")
-      (is (= rewrites (g/rewrites lvl scroll))
+      (is (= rewrites (replay/rewrites lvl scroll))
           "a different set of rewrites fired, or in a different order")
-      (is (= steps (:steps (peek (g/trace (g/init-state lvl scroll)))))
+      (is (= steps (:steps (peek (replay/trace (g/init-state lvl scroll)))))
           "the golem read a different number of tiles"))))
 
 ;; ─────────────────────────────────────────────────────────────
@@ -138,7 +139,7 @@
 (deftest every-run-is-structurally-sound
   (doseq [{:keys [why level scroll]} scenarios
           :let [lvl   (level-by-id level)
-                trace (g/trace (g/init-state lvl scroll))]]
+                trace (replay/trace (g/init-state lvl scroll))]]
     (testing why
 
       (testing "a run is :running until it stops, and then it has stopped"
@@ -169,7 +170,7 @@
       (testing "the golem never teleports — each move is one orthogonal square"
         ;; `path` collapses non-moves, so consecutive entries are real moves.
         (is (every? #(apply adjacent? %)
-                    (partition 2 1 (g/path lvl scroll)))))
+                    (partition 2 1 (replay/path lvl scroll)))))
 
       (testing "the level itself is never mutated by running a scroll on it"
         (is (= lvl (:level (peek trace)))))

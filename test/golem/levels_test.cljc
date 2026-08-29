@@ -8,6 +8,7 @@
             [clojure.string :as str]
             [golem.core :as g]
             [golem.levels :as levels]
+            [golem.replay :as replay]
             [golem.scroll :as scroll]))
 
 (defn level-by-id
@@ -30,7 +31,7 @@
 (deftest every-level-is-solvable
   (doseq [{:keys [id solution capacity] :as level} levels/all]
     (testing (str "level " id)
-      (is (= :won (g/outcome level solution))
+      (is (= :won (replay/outcome level solution))
           (str "level " id " reference solution must win"))
       (is (<= (count solution) capacity)
           (str "level " id " solution must fit the scroll capacity")))))
@@ -81,15 +82,15 @@
   (testing "level 2: gem unreachable without the unfold tile"
     (let [l2 (level-by-id 2)]
       ;; capacity is 4, gem is 6 walks away — best naive attempt falls short
-      (is (= :empty (g/outcome l2 [:walk :walk :walk :walk])))))
+      (is (= :empty (replay/outcome l2 [:walk :walk :walk :walk])))))
   (testing "level 4: a raw right turn sends the golem into the wall"
     (let [l4 (level-by-id 4)]
-      (is (= :crashed (g/outcome l4 [:walk :walk :walk :right
+      (is (= :crashed (replay/outcome l4 [:walk :walk :walk :right
                                      :walk :walk :walk :walk])))))
   (testing "level 5: writing the path forwards fails — the rune reverses it"
     (let [l5 (level-by-id 5)]
-      (is (= :empty (g/outcome l5 [:walk :walk :walk :left :walk :walk])))))
+      (is (= :empty (replay/outcome l5 [:walk :walk :walk :left :walk :walk])))))
   (testing "level 6: the best ×3 route needs 7 tiles — one over capacity"
     (let [l6 (level-by-id 6)]
-      (is (= :won (g/outcome l6 [:x3 :walk :walk :left :x3 :walk :walk])))
+      (is (= :won (replay/outcome l6 [:x3 :walk :walk :left :x3 :walk :walk])))
       (is (< (:capacity l6) 7)))))
