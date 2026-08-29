@@ -100,3 +100,23 @@
   (testing "terminal? is defined negatively, so a future status is terminal for free"
     (is (g/terminal? {:status :overflow}))
     (is (not (g/running? {:status :overflow})))))
+
+(deftest step-is-total
+  ;; The engine's contract is (iterate step initial-state), and iterate never
+  ;; stops — so step has to be defined for a state it cannot advance. golem.ui
+  ;; leans on this directly: tick! steps :game FIRST and only then asks whether
+  ;; to stop the timer, so a finished run and a stale tick both land here.
+  (testing "every terminal status is a fixed point"
+    (doseq [[scroll expected] [[[:walk]       :empty]
+                               [[:left :walk] :crashed]
+                               [[:echo :echo] :exhausted]]]
+      (let [done (peek (g/trace (g/init-state fixture-level scroll {:max-steps 8})))]
+        (testing (str expected)
+          (is (= expected (:status done)))
+          (is (= done (g/step done)))))))
+  (testing "a won game is a fixed point too — the gem cannot be walked off"
+    (let [won (peek (g/trace (g/init-state (assoc fixture-level :gem [1 0]) [:walk])))]
+      (is (= :won (:status won)))
+      (is (= won (g/step won)))))
+  (testing "no game at all steps to no game — a stale UI tick cannot throw"
+    (is (nil? (g/step nil)))))

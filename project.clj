@@ -34,8 +34,26 @@
 
   :profiles {:dev {:dependencies [[org.slf4j/slf4j-nop "2.0.16"]
                                   [com.bhauman/figwheel-main "0.2.20"]
-                                  [com.bhauman/rebel-readline-cljs "0.1.4"]]
+                                  [com.bhauman/rebel-readline-cljs "0.1.4"]
+                                  ;; JUnit 5, for the Java mirrors under test/java.
+                                  ;; jupiter = the @Test API and engine, launcher =
+                                  ;; the programmatic runner golem.java-test drives.
+                                  [org.junit.jupiter/junit-jupiter "5.10.2"]
+                                  [org.junit.platform/junit-platform-launcher "1.10.2"]]
                    :plugins [[lein-cloverage "1.2.4"]]
+
+                   ;; Java mirrors of the Clojure tests — a reading aid, not a
+                   ;; second suite. lein's javac prep task compiles these before
+                   ;; `lein test`, and golem.java-test runs them. Dev/test only,
+                   ;; so they never reach a build artifact.
+                   :java-source-paths ["test/java"]
+
+                   ;; Pin the bytecode level so it does not matter which JDK
+                   ;; compiles these — a class built by a newer javac than the
+                   ;; JDK running `lein test` fails to load (UnsupportedClass-
+                   ;; VersionError). 17 is the floor we support; raise it only
+                   ;; if every JDK in use is newer.
+                   :javac-options ["--release" "17"]
                    :resource-paths ["target"]
                    
                    ;; need to add the compiled assets to the :clean-targets
