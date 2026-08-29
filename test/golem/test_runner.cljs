@@ -5,6 +5,7 @@
     [golem.core-test]
     [golem.scroll-test]
     [golem.levels-test]
+    [golem.scenario-test]
     [golem.ui-test]
     [figwheel.main.testing :refer [run-tests-async]]))
 
