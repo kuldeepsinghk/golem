@@ -116,39 +116,68 @@
         (cond-> moved
           (= dest (:gem level)) (assoc :status :won))))))
 
+;; ─────────────────────────────────────────────────────────────
+;; One step, in five stages
+;;
+;; Stages 2 and 3 are halts: each returns a finished state, or nil for
+;; "not my case, keep reading". Stages 4 and 5 always produce a new state.
+;; `step` itself, at the bottom, is the five of them in order.
+
+(defn- halt-when-out-of-tiles
+  "2. The scroll ran out before the golem reached the gem."
+  [{:keys [scroll] :as state}]
+  (when (empty? scroll)
+    (assoc state :status :empty :rewrite nil)))
+
+(defn- halt-when-fuse-blown
+  "3. The fuse — see default-max-steps."
+  [{:keys [steps max-steps] :as state}]
+  (when (>= steps (or max-steps default-max-steps))
+    (assoc state :status :exhausted :rewrite nil)))
+
+(defn- consume-head-tile
+  "4. Read one tile off the scroll, and remember it as :last-tile.
+
+   The tile is consumed once, here — stage 5 reads a state whose scroll has
+   ALREADY advanced past it. So a rewrite is an `update` on that scroll, a
+   turn touches only :dir, and a new tile cannot forget to move the scroll on."
+  [{:keys [scroll] :as state}]
+  (-> state
+      (update :steps inc)
+      (update :scroll (comp vec rest))
+      (assoc :rewrite nil :last-tile (first scroll))))
+
+(defn- apply-tile
+  "5. Do what the tile says — the tile stage 4 just consumed.
+
+   Every tile is one line of the `case`: the golem's move lives in `walk`,
+   a scroll rewrite is an `update` on the already-advanced scroll."
+  [{:keys [last-tile] :as state}]
+  (case last-tile
+    :walk   (walk state)
+    :left   (update state :dir turn-left)
+    :right  (update state :dir turn-right)
+    :x3     (rewrite-with state scroll/unfold-3 :unfold)
+    :mirror (rewrite-with state scroll/mirror   :mirror)
+    :echo   (rewrite-with state scroll/echo     :echo)
+    ;; unknown tile: skip it — the scroll already advanced past it
+    state))
+
 (defn step
   "Consume the head of the scroll, produce the next state.
    The entire game is (iterate step initial-state).
 
-   Every tile is one line of the `case` below: the golem's move lives in
-   `walk`, a scroll rewrite is an `update` on the already-advanced scroll."
-  [{:keys [scroll] :as state}]
+   Read top to bottom: two ways a step can halt, then the two that advance
+   the game. Each numbered stage is one function above."
+  [state]
   (if-not (running? state)
+    ;; 1. step is total, so a state it cannot advance is its own next state.
+    ;;    This stage stays here rather than joining the `or` below: nil is a
+    ;;    valid state (no game — the player is editing), and an `or` cannot
+    ;;    tell "the guard returned nil" from "the state IS nil".
     state
-    (cond
-      (empty? scroll)
-      (assoc state :status :empty :rewrite nil)
-
-      ;; the fuse — see default-max-steps
-      (>= (:steps state) (or (:max-steps state) default-max-steps))
-      (assoc state :status :exhausted :rewrite nil)
-
-      :else
-      ;; The tile is consumed once, here — every branch below reads a state
-      ;; whose scroll has ALREADY advanced past it. So a rewrite is an
-      ;; `update` on that scroll, a turn touches only :dir, and a new tile
-      ;; cannot forget to move the scroll on.
-      (let [tile  (first scroll)
-            state (-> state
-                      (update :steps inc)
-                      (update :scroll (comp vec rest))
-                      (assoc :rewrite nil :last-tile tile))]
-        (case tile
-          :walk   (walk state)
-          :left   (update state :dir turn-left)
-          :right  (update state :dir turn-right)
-          :x3     (rewrite-with state scroll/unfold-3 :unfold)
-          :mirror (rewrite-with state scroll/mirror   :mirror)
-          :echo   (rewrite-with state scroll/echo     :echo)
-          ;; unknown tile: skip it — the scroll already advanced past it
-          state)))))
+    (or (halt-when-out-of-tiles state)     ; 2.
+        (halt-when-fuse-blown   state)     ; 3.
+        (-> state
+            consume-head-tile              ; 4.
+            apply-tile))))                 ; 5.
