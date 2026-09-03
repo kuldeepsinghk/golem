@@ -68,6 +68,25 @@
   (stop-timer!)
   (swap! state assoc :level-ix ix :scroll [] :game nil))
 
+(defn next-level-ix
+  "The index after the current level, or nil on the last one.
+
+   One place owns the bounds check: `next-level!` asks whether to move and
+   `controls` asks whether to draw the button at all."
+  []
+  (let [next (inc (:level-ix @state))]
+    (when (< next (count levels/all)) next)))
+
+(defn next-level!
+  "Advance to the level after this one, as the win button does.
+
+   Delegates to select-level!, so the new level arrives the same way a tab
+   click leaves it: timer stopped, blank scroll, edit mode. Winning the last
+   level leaves the player where they are."
+  []
+  (when-let [ix (next-level-ix)]
+    (select-level! ix)))
+
 ;; ─────────────────────────────────────────────────────────────
 ;; Look & feel
 
@@ -224,18 +243,29 @@
      [button "▶ Run" start! (and (seq scroll) (nil? game))]
      [button "Step" step-once! false]
      [button "Reset golem" reset-run! false]
-     [button "Clear scroll" clear-scroll! false]]))
+     [button "Clear scroll" clear-scroll! false]
+     ;; The reward, where the eye already is. Absent until the golem reaches
+     ;; the gem, and absent on the last level, which has nowhere to go.
+     (when (and (= :won (:status game)) (next-level-ix))
+       [button "Next level →" next-level! true])]))
 
 (defn level-tabs []
-  [:div {:style {:display "flex" :gap 6 :margin-bottom 12}}
-   (for [[ix {:keys [id name]}] (map-indexed vector levels/all)]
-     ^{:key id}
-     [:div {:on-click #(select-level! ix)
-            :style {:padding "6px 12px" :border-radius 6 :cursor "pointer"
-                    :font-family "Georgia, serif" :font-size 13
-                    :background (if (= ix (:level-ix @state)) "#b45309" "#1e293b")
-                    :color (if (= ix (:level-ix @state)) "#fff" "#94a3b8")}}
-      (str id ". " name)])])
+  ;; Read :level-ix HERE, not inside the `for` below. `for` is lazy, so a deref
+  ;; inside it is realized after this function has returned — outside Reagent's
+  ;; reactive context — and the component then never re-renders when the level
+  ;; changes. The tab highlight silently sticks on whichever level was current
+  ;; at mount while the rest of the page updates around it. Every other
+  ;; component in this namespace derefs at the top of its body for this reason.
+  (let [current (:level-ix @state)]
+    [:div {:style {:display "flex" :gap 6 :margin-bottom 12}}
+     (for [[ix {:keys [id name]}] (map-indexed vector levels/all)]
+       ^{:key id}
+       [:div {:on-click #(select-level! ix)
+              :style {:padding "6px 12px" :border-radius 6 :cursor "pointer"
+                      :font-family "Georgia, serif" :font-size 13
+                      :background (if (= ix current) "#b45309" "#1e293b")
+                      :color (if (= ix current) "#fff" "#94a3b8")}}
+        (str id ". " name)])]))
 
 (defn game-root []
   (let [level (current-level)]
